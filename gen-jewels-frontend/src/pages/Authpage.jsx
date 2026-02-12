@@ -180,7 +180,7 @@ export default function AuthPage() {
                         Welcome Back
                       </h1>
                       <p className="text-gray-500 text-base" style={{ fontFamily: "'Inter', sans-serif" }}>
-                        Sign in to GenaJewel
+                        Sign in to GenaJewels
                       </p>
                     </div>
 
