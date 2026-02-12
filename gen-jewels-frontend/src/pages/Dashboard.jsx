@@ -130,6 +130,9 @@ export default function Dashboard() {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const prevGenerating = useRef(false);
 
+  // --- 1. GET DYNAMIC BASE URL ---
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
   // --- STATE ---
   const [params, setParams] = useState(() => {
     const savedParams = localStorage.getItem('dashboard_params');
@@ -310,8 +313,9 @@ export default function Dashboard() {
             {latestDesign && !isGenerating ? (
               <div className="relative w-full h-full animate-fade-in flex flex-col">
                 <div className="flex-grow overflow-auto">
+                  {/* UPDATE: Use Dynamic Base URL */}
                   <img 
-                    src={`http://localhost:8000/${latestDesign.image_url}`} 
+                    src={`${API_BASE_URL}/${latestDesign.image_url}`} 
                     className="w-full h-full object-contain p-4" 
                     alt="Generated Design" 
                   />

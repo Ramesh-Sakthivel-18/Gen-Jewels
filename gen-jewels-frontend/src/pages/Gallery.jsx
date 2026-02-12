@@ -7,6 +7,9 @@ export default function Gallery() {
   const { isServerLive, isChecking } = useServer(); // GET SERVER STATUS
   const [selectedDesign, setSelectedDesign] = useState(null); // Controls the Modal
 
+  // --- 1. GET DYNAMIC BASE URL ---
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
   useEffect(() => {
     // Only attempt to fetch if the server is alive
     if (isServerLive) {
@@ -22,10 +25,11 @@ export default function Gallery() {
     });
   };
 
-  // Helper: Get Image URL (Safe)
+  // Helper: Get Image URL (Safe & Dynamic)
   const getImageUrl = (path) => {
     if (!path) return "https://via.placeholder.com/400x400?text=No+Image";
-    return `http://localhost:8000/${path}`;
+    // UPDATE: Use API_BASE_URL instead of hardcoded localhost
+    return `${API_BASE_URL}/${path}`;
   };
 
   return (
