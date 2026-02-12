@@ -1,18 +1,29 @@
 import { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api'; 
 import { useServer } from '../context/ServerContext';
 import toast from 'react-hot-toast';
-
-// Helper function to handle image URLs (handles Windows backslashes and uses env variable)
-const getImageUrl = (imagePath) => {
-  if (!imagePath) return '';
-  const normalizedPath = imagePath.replace(/\\/g, '/');
-  return `${import.meta.env.VITE_API_URL}/${normalizedPath}`;
-};
 
 export default function ImageToImage() {
   const { isServerLive, isChecking } = useServer();
   
+  // --- 1. GET DYNAMIC TUNNEL URL ---
+  // If on Vercel, this uses the Tunnel. If on Localhost, it uses localhost.
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+  // --- Helper: Construct Image URL ---
+  // This handles the path safely for both Windows and Web
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return "";
+    // If the backend sends a full URL, use it. Otherwise, attach our Base URL.
+    if (imagePath.startsWith('http')) return imagePath;
+    
+    // Ensure we don't have double slashes
+    const cleanBase = API_BASE_URL.replace(/\/$/, '');
+    const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+    
+    return `${cleanBase}${cleanPath}`;
+  };
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [jewelryType, setJewelryType] = useState('');
@@ -42,7 +53,6 @@ export default function ImageToImage() {
     }
   }, [isGenerating]);
 
-  // Calculate aspect ratio when result image loads
   useEffect(() => {
     if (resultImage) {
       const img = new Image();
@@ -50,6 +60,7 @@ export default function ImageToImage() {
         const ratio = img.width / img.height;
         setImageAspectRatio(ratio);
       };
+      // FIX: Use dynamic URL instead of localhost
       img.src = getImageUrl(resultImage);
     } else {
       setImageAspectRatio(16/9);
@@ -78,38 +89,28 @@ export default function ImageToImage() {
     
     setIsGenerating(true);
     
-    // Create FormData with correct field names
     const formData = new FormData();
-    formData.append('file', selectedFile); // IMPORTANT: Backend expects 'file'
-    formData.append('prompt', `${jewelryType}${prompt ? ': ' + prompt : ''}`); // Combine jewelry type with prompt
+    formData.append('init_image', selectedFile); 
+    formData.append('jewelry_type', jewelryType); 
+    formData.append('prompt', prompt); 
+    formData.append('strength', '0.75'); 
 
     try {
-      // Use environment variable for API URL
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/generate-image`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'bypass-tunnel-reminder': 'true', // Required for LocalTunnel
-            'ngrok-skip-browser-warning': 'true' // Extra safety for ngrok
-          }
+      // FIX: Added headers to bypass Tunnel warning pages
+      const response = await api.post('/generate/image-to-image', formData, { 
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          'bypass-tunnel-reminder': 'true',
+          'ngrok-skip-browser-warning': 'true'
         }
-      );
+      });
       
+      // Backend returns relative path, e.g., "storage/generated/..."
       setResultImage(response.data.image_url);
       toast.success("✨ Transformation Complete!");
     } catch (error) {
-      console.error('Generation error:', error);
-      if (error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
-        toast.error(`⚠️ Generation Failed: ${error.response.status} - ${error.response.data?.detail || 'Unknown error'}`);
-      } else if (error.request) {
-        toast.error("⚠️ No response from server. Check backend connection.");
-      } else {
-        toast.error(`⚠️ Request error: ${error.message}`);
-      }
+      console.error(error);
+      toast.error("⚠️ Generation Failed. Check backend connection.");
     } finally {
       setIsGenerating(false);
       setLoadingMessageIndex(0);
@@ -151,84 +152,34 @@ export default function ImageToImage() {
   };
 
   const jewelryTypes = [
-    { name: 'Necklace', icon: '📿' },
-    { name: 'Earring', icon: '💎' },
-    { name: 'Bangle', icon: '⭕' }
+    { name: 'Necklace' },
+    { name: 'Earring' },
+    { name: 'Bangle' }
   ];
 
   return (
     <div className="relative max-w-7xl mx-auto min-h-[calc(100vh-100px)] p-6">
-      
+       {/* (Keeping your original CSS styles) */}
       <style>{`
-        @keyframes rotate-outer {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        @keyframes rotate-middle {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(-360deg); }
-        }
-        @keyframes rotate-inner {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        @keyframes pulse-glow {
-          0%, 100% { opacity: 0.6; transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.1); }
-        }
-        @keyframes fade-in-out {
-          0%, 100% { opacity: 0; transform: translateY(10px); }
-          10%, 90% { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes scale-up {
-          0% { opacity: 0; transform: scale(0.9); }
-          100% { opacity: 1; transform: scale(1); }
-        }
-        @keyframes fade-in {
-          0% { opacity: 0; }
-          100% { opacity: 1; }
-        }
-        @keyframes slide-up {
-          0% { opacity: 0; transform: translateY(20px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes shimmer {
-          0% { background-position: -1000px 0; }
-          100% { background-position: 1000px 0; }
-        }
+        @keyframes rotate-outer { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes rotate-middle { 0% { transform: rotate(0deg); } 100% { transform: rotate(-360deg); } }
+        @keyframes rotate-inner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse-glow { 0%, 100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.1); } }
+        @keyframes fade-in-out { 0%, 100% { opacity: 0; transform: translateY(10px); } 10%, 90% { opacity: 1; transform: translateY(0); } }
+        @keyframes scale-up { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes fade-in { 0% { opacity: 0; } 100% { opacity: 1; } }
+        @keyframes slide-up { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+        @keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
         
-        .rotate-outer {
-          animation: rotate-outer 3s linear infinite;
-        }
-        .rotate-middle {
-          animation: rotate-middle 2s linear infinite;
-        }
-        .rotate-inner {
-          animation: rotate-inner 1.5s linear infinite;
-        }
-        .pulse-glow {
-          animation: pulse-glow 2s ease-in-out infinite;
-        }
-        .fade-message {
-          animation: fade-in-out 3s ease-in-out infinite;
-        }
-        .scale-up {
-          animation: scale-up 0.3s ease-out;
-        }
-        .fade-in {
-          animation: fade-in 0.5s ease-out;
-        }
-        .slide-up {
-          animation: slide-up 0.4s ease-out;
-        }
-        .shimmer {
-          background: linear-gradient(90deg, 
-            transparent 0%, 
-            rgba(255,255,255,0.1) 50%, 
-            transparent 100%);
-          background-size: 1000px 100%;
-          animation: shimmer 2s infinite;
-        }
+        .rotate-outer { animation: rotate-outer 3s linear infinite; }
+        .rotate-middle { animation: rotate-middle 2s linear infinite; }
+        .rotate-inner { animation: rotate-inner 1.5s linear infinite; }
+        .pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+        .fade-message { animation: fade-in-out 3s ease-in-out infinite; }
+        .scale-up { animation: scale-up 0.3s ease-out; }
+        .fade-in { animation: fade-in 0.5s ease-out; }
+        .slide-up { animation: slide-up 0.4s ease-out; }
+        .shimmer { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); background-size: 1000px 100%; animation: shimmer 2s infinite; }
       `}</style>
 
       {/* OFFLINE MODAL OVERLAY */}
@@ -238,11 +189,9 @@ export default function ImageToImage() {
             <div className="w-24 h-24 bg-gradient-to-br from-red-50 to-rose-100 text-red-500 rounded-full flex items-center justify-center text-5xl mx-auto mb-6 shadow-lg">
               🔌
             </div>
-            <h2 className="text-3xl font-bold text-slate-900 mb-4 tracking-tight">
-              AI Engine Offline
-            </h2>
+            <h2 className="text-3xl font-bold text-slate-900 mb-4 tracking-tight">AI Engine Offline</h2>
             <p className="text-slate-600 text-lg mb-8 leading-relaxed">
-              The backend AI engine is currently resting. We cannot process transformations right now. Please check back later!
+              The backend AI engine is currently resting. We cannot process image transformations right now. Please check back later!
             </p>
             <button 
               onClick={() => window.location.reload()} 
@@ -259,80 +208,76 @@ export default function ImageToImage() {
         
         {/* HEADER */}
         <div className="text-center mb-10 fade-in">
-          <h1 className="text-5xl font-bold text-slate-900 mb-4 tracking-tight">
-            Image to Image
-          </h1>
-          <p className="text-slate-600 text-lg max-w-2xl mx-auto leading-relaxed">
-            Upload your jewelry image and watch our AI transform it into something extraordinary.
+          <h1 className="text-5xl font-bold text-slate-900 mb-4 tracking-tight leading-tight">Image to Image Transformation</h1>
+          <p className="text-slate-600 text-xl max-w-2xl mx-auto font-light leading-relaxed">
+            Upload a jewelry photo, choose a type, and let AI refine it into a stunning design.
           </p>
         </div>
 
-        {/* TWO COLUMN LAYOUT */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          {/* LEFT COLUMN: UPLOAD + OPTIONS */}
-          <div className="space-y-6 slide-up">
-            
-            {/* FILE UPLOAD BOX */}
+        {/* MAIN GRID */}
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* LEFT COLUMN: INPUTS */}
+          <div className="space-y-6 slide-up" style={{ animationDelay: '0.1s' }}>
+            {/* UPLOAD AREA */}
             <div 
-              className={`relative border-4 border-dashed rounded-3xl p-12 text-center transition-all duration-300 cursor-pointer overflow-hidden group
-                ${selectedFile 
-                  ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50' 
-                  : 'border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-slate-100'}
-              `}
+              className="group relative p-6 bg-white rounded-3xl shadow-lg border border-slate-200/50 transition-all duration-300 hover:shadow-xl hover:border-indigo-200/50 cursor-pointer"
+              onClick={() => !previewUrl && fileInputRef.current.click()}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
-              onClick={() => fileInputRef.current.click()}
             >
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/0 to-purple-50/0 group-hover:from-indigo-50/10 group-hover:to-purple-50/10 rounded-3xl transition-all duration-500" />
+              
+              <div className="relative">
+                {previewUrl ? (
+                  <div className="relative rounded-2xl overflow-hidden shadow-md">
+                    <img 
+                      src={previewUrl} 
+                      className="w-full h-64 object-cover transition-transform duration-500 group-hover:scale-105" 
+                      alt="Uploaded Jewelry"
+                    />
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current.click();
+                      }}
+                      className="absolute bottom-4 right-4 bg-white/90 text-slate-900 px-4 py-2 rounded-full font-medium text-sm shadow-md hover:bg-white transition-all duration-300 flex items-center gap-2 backdrop-blur-sm"
+                    >
+                      <span className="text-blue-500">🔄</span> Change Image
+                    </button>
+                  </div>
+                ) : (
+                  <div className="h-64 flex flex-col items-center justify-center text-center border-2 border-dashed border-slate-300 rounded-2xl transition-colors duration-300 group-hover:border-indigo-400">
+                    <div className="text-5xl mb-4 text-indigo-400">📸</div>
+                    <p className="text-slate-700 font-medium mb-2">Upload Jewelry Image</p>
+                    <p className="text-slate-500 text-sm">Drag & drop or click to select</p>
+                    <p className="text-slate-400 text-xs mt-2">Max 10MB • JPG, PNG, WEBP</p>
+                  </div>
+                )}
+              </div>
+
               <input 
-                ref={fileInputRef}
                 type="file" 
-                accept="image/*" 
+                ref={fileInputRef} 
                 onChange={handleFileChange} 
+                accept="image/*" 
                 className="hidden" 
               />
-
-              {previewUrl ? (
-                <div className="relative">
-                  <img 
-                    src={previewUrl} 
-                    className="max-h-64 mx-auto rounded-2xl shadow-xl border-4 border-white group-hover:scale-105 transition-transform duration-300" 
-                    alt="Preview" 
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-4">
-                    <p className="text-white font-bold text-sm">Click to change image</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="fade-in">
-                  <div className="text-7xl mb-4 drop-shadow-lg">📸</div>
-                  <p className="text-slate-700 text-xl font-semibold mb-2">
-                    Drop your image here
-                  </p>
-                  <p className="text-slate-500 text-sm">
-                    or click to browse (Max 10MB)
-                  </p>
-                </div>
-              )}
             </div>
 
-            {/* JEWELRY TYPE SELECTOR */}
-            <div>
-              <label className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-4 block">
-                💎 Select Jewelry Type
+            {/* JEWELRY TYPE SELECTION */}
+            <div className="p-6 bg-white rounded-3xl shadow-lg border border-slate-200/50">
+              <label className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-4 block flex items-center gap-2">
+                <span className="text-blue-500">💎</span> Select Jewelry Type
               </label>
               <div className="grid grid-cols-3 gap-4">
                 {jewelryTypes.map((type) => (
                   <button
                     key={type.name}
                     onClick={() => setJewelryType(type.name)}
-                    disabled={isGenerating}
-                    className={`p-6 rounded-2xl border-2 transition-all duration-300 flex flex-col items-center justify-center space-y-2 shadow-md hover:shadow-xl
-                      ${isGenerating 
-                        ? 'opacity-50 cursor-not-allowed' 
-                        : jewelryType === type.name 
-                        ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white scale-105 border-indigo-600' 
-                        : 'bg-slate-50 hover:bg-slate-100 hover:shadow-lg hover:scale-105 border-slate-200'}
+                    className={`p-4 rounded-2xl text-center transition-all duration-300 shadow-md
+                      ${jewelryType === type.name 
+                        ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white scale-105' 
+                        : 'bg-slate-50 hover:bg-slate-100 hover:shadow-lg hover:scale-105'}
                     `}
                   >
                     <div className="text-3xl mb-2">{type.icon}</div>
@@ -342,35 +287,17 @@ export default function ImageToImage() {
               </div>
             </div>
 
-            {/* OPTIONAL PROMPT INPUT */}
-            <div>
-              <label className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3 block">
-                ✨ Additional Instructions (Optional)
-              </label>
-              <textarea
-                className={`w-full p-5 text-base bg-slate-50 border-2 rounded-2xl outline-none transition-all resize-none h-32 font-medium ${
-                  isGenerating
-                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200'
-                    : 'focus:bg-white focus:border-indigo-500 focus:shadow-lg border-slate-200 hover:border-slate-300'
-                }`}
-                placeholder="E.g., Make it more elegant, add gemstones, change to gold finish..."
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                disabled={isGenerating}
-              />
-            </div>
-
             {/* GENERATE BUTTON */}
             <button
               onClick={handleGenerate}
-              disabled={isGenerating || !selectedFile || !jewelryType || !isServerLive}
+              disabled={isGenerating || !selectedFile || !jewelryType}
               className={`w-full py-6 text-white font-bold rounded-3xl text-xl shadow-2xl transition-all duration-300 transform
-                ${isGenerating || !selectedFile || !jewelryType || !isServerLive
+                ${isGenerating || !selectedFile || !jewelryType 
                   ? 'bg-slate-400 cursor-not-allowed' 
                   : 'bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 hover:shadow-3xl hover:scale-105 hover:brightness-105'}
               `}
             >
-              {!isServerLive ? '🔴 Offline' : isGenerating ? '✨ Transforming...' : '🚀 Transform Image'}
+              {isGenerating ? 'Transforming...' : '✨ Transform Image'}
             </button>
           </div>
 
@@ -395,6 +322,7 @@ export default function ImageToImage() {
                 ) : null}
 
                 {resultImage && !isGenerating ? (
+                  // FIX: Display result using Helper Function
                   <img 
                     src={getImageUrl(resultImage)} 
                     className="max-w-full max-h-full object-contain rounded-2xl transition-all duration-300" 
@@ -476,6 +404,7 @@ export default function ImageToImage() {
 
             {/* Left: Full Image */}
             <div className="md:w-3/5 bg-black flex items-center justify-center p-8">
+              {/* FIX: Use Dynamic URL here too */}
               <img
                 src={getImageUrl(resultImage)}
                 className="max-w-full max-h-full object-contain"
@@ -528,6 +457,7 @@ export default function ImageToImage() {
 
                 {/* Download Button */}
                 <div className="mt-auto pt-6">
+                  {/* FIX: Use Dynamic URL for download */}
                   <a
                     href={getImageUrl(resultImage)}
                     download
