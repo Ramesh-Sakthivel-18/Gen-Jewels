@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from config.database import Base, engine
 from app.controllers import auth, generation
 
-# --- LIFESPAN MANAGER (Startup & Shutdown) ---
+# --- LIFESPAN MANAGER (Database Startup) ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("🚀 Starting Gen Jewels Backend...")
@@ -19,35 +19,36 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"❌ Database Connection Failed: {e}")
 
-    # 2. Ensure Storage Directory Exists
-    if not os.path.exists("storage/generated_image"):
-        os.makedirs("storage/generated_image")
-        print("✅ Created 'storage/generated_image' directory.")
-
     yield
     print("🛑 Shutting down...")
 
 app = FastAPI(title="Gen Jewels API", version="1.0", lifespan=lifespan)
 
 # --- 1. CRITICAL: ENABLE CORS FOR NGROK ---
-# This allows your Cloud Frontend (Vercel/Netlify) to talk to your Local Backend
+# This allows your Cloud Frontend to talk to your Local Backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all cloud domains
+    allow_origins=["*"],  # Allows all cloud domains (Vercel, Netlify, etc.)
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all types of requests (GET, POST, etc.)
+    allow_methods=["*"],  # Allows all types of requests
     allow_headers=["*"],
 )
 
-# --- 2. Mount Static Files (To view generated images) ---
-# This makes http://your-ngrok-url.com/storage/generated_image/xyz.png valid
+# --- 2. STATIC FILES MOUNT (The Fix) ---
+# We ensure the folder exists BEFORE mounting it to prevent crashes.
+if not os.path.exists("storage"):
+    os.makedirs("storage")
+    print("✅ Created 'storage' directory.")
+
+# This exposes the folder so images are accessible at:
+# http://your-ngrok-url.com/storage/generated_image/filename.png
 app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 
 # --- 3. Register Routers ---
 app.include_router(auth.router)
 app.include_router(generation.router)
 
-# --- 4. Health Check (The "Doorbell" for Frontend) ---
+# --- 4. Health Check (Doorbell) ---
 @app.get("/health", tags=["System"])
 def health_check():
     """
