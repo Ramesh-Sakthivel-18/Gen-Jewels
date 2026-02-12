@@ -18,6 +18,10 @@ export const ServerProvider = ({ children }) => {
 
         const response = await fetch(`${API_BASE_URL}/health`, {
           method: 'GET',
+          headers: {
+             // ADDED: Critical header for Ngrok free tier
+            'ngrok-skip-browser-warning': 'true'
+          },
           signal: controller.signal,
         });
 
@@ -36,12 +40,14 @@ export const ServerProvider = ({ children }) => {
       }
     };
 
-    // Initial check
+    // Initial check immediately when the website loads
     checkServerStatus();
 
-    // Poll every 30 seconds
-    const intervalId = setInterval(checkServerStatus, 30000);
+    // RAPID 1-MINUTE POLLING
+    // 60000 milliseconds = Exactly 1 Minute
+    const intervalId = setInterval(checkServerStatus, 60000);
 
+    // Cleanup interval if the user closes the app
     return () => clearInterval(intervalId);
   }, [API_BASE_URL]);
 
