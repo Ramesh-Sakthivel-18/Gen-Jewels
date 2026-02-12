@@ -147,7 +147,7 @@ export default function TextToImage() {
             {latestDesign ? (
               <div className="relative w-full h-full bg-black cursor-pointer" onClick={() => setShowModal(true)}>
                 <img 
-                  src={`http://localhost:8000/${latestDesign.image_url}`} 
+                  src={`${import.meta.env.VITE_API_URL}/${latestDesign.image_url}`} 
                   className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" 
                   alt="AI Generated Design" 
                 />
@@ -293,7 +293,7 @@ export default function TextToImage() {
             {/* Left: Full Image */}
             <div className="md:w-3/5 bg-black flex items-center justify-center p-8">
               <img
-                src={`http://localhost:8000/${latestDesign.image_url}`}
+                src={`${import.meta.env.VITE_API_URL}/${latestDesign.image_url}`}
                 className="max-w-full max-h-full object-contain"
                 alt="Full Size Design"
               />
@@ -337,7 +337,7 @@ export default function TextToImage() {
                 {/* Download Button */}
                 <div className="mt-auto pt-6">
                   <a
-                    href={`http://localhost:8000/${latestDesign.image_url}`}
+                    href={`${import.meta.env.VITE_API_URL}/${latestDesign.image_url}`}
                     download
                     className="flex items-center justify-center w-full py-5 bg-gradient-to-r from-slate-900 to-slate-700 text-white font-bold rounded-2xl hover:shadow-2xl hover:scale-105 transition-all duration-300 gap-2"
                   >
