@@ -1,23 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useDesign } from '../context/DesignContext';
-import { useServer } from '../context/ServerContext'; // SERVER HOOK
+import { useServer } from '../context/ServerContext'; // Imported to monitor backend status
 
 export default function Gallery() {
   const { history, fetchHistory } = useDesign();
-  const { isServerLive, isChecking } = useServer(); // GET SERVER STATUS
-  const [selectedDesign, setSelectedDesign] = useState(null); // Controls the Modal
+  const { isServerLive, isChecking } = useServer(); // Accesses the global heartbeat state
+  const [selectedDesign, setSelectedDesign] = useState(null); // Controls the Details Modal
 
-  // --- 1. GET DYNAMIC BASE URL ---
+  // --- 1. DYNAMIC BASE URL ---
+  // Reads the tunnel URL from Netlify environment variables
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
-    // Only attempt to fetch if the server is alive
+    // Only attempt to fetch history if the server is verified as online
     if (isServerLive) {
       fetchHistory();
     }
-  }, [isServerLive]);
+  }, [isServerLive, fetchHistory]);
 
-  // Helper: Format Date
+  // Helper: Format Date for the UI
   const formatDate = (dateString) => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -25,27 +26,30 @@ export default function Gallery() {
     });
   };
 
-  // --- FIX 1: WINDOWS PATH & URL HANDLING ---
+  // --- FIX: WINDOWS PATH & URL HANDLING ---
+  // Converts Windows-style backslashes (\) to web-friendly forward slashes (/)
   const getImageUrl = (path) => {
     if (!path) return "";
     
-    // 1. Replace Windows backslashes (\) with forward slashes (/)
+    // 1. Replace Windows backslashes with forward slashes
     const cleanPath = path.replace(/\\/g, '/');
 
-    // 2. Construct the full URL safely (remove trailing slash from base if present)
+    // 2. Construct the full URL safely without double slashes
     const baseUrl = API_BASE_URL.replace(/\/$/, ''); 
     const finalPath = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
 
     return `${baseUrl}${finalPath}`;
   };
 
-  // --- LOCAL PLACEHOLDER (To avoid network blocking) ---
+  // --- LOCAL PLACEHOLDER ---
+  // This Data URI bypasses network blocks on external sites like via.placeholder.com
   const PLACEHOLDER_IMAGE = "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22400%22%20viewBox%3D%220%200%20400%20400%22%3E%3Crect%20fill%3D%22%23f3f4f6%22%20width%3D%22400%22%20height%3D%22400%22%2F%3E%3Ctext%20fill%3D%22%239ca3af%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20dy%3D%2210.5%22%20font-weight%3D%22bold%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%3EImage%20Not%20Found%3C%2Ftext%3E%3C%2Fsvg%3E";
 
   return (
     <div className="max-w-7xl mx-auto min-h-screen relative p-4">
       
       {/* --- OFFLINE MODAL OVERLAY --- */}
+      {/* Blurs and blocks the UI if the ngrok tunnel is disconnected */}
       {!isServerLive && !isChecking && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-white/30 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 p-8 md:p-12 max-w-lg text-center transform scale-100 animate-scale-up">
@@ -69,7 +73,7 @@ export default function Gallery() {
       {/* --- MAIN CONTENT (Blurs if offline) --- */}
       <div className={`transition-all duration-700 ${!isServerLive && !isChecking ? 'blur-lg pointer-events-none select-none grayscale-[0.3]' : ''}`}>
         
-        {/* --- HEADER --- */}
+        {/* HEADER */}
         <div className="flex justify-between items-end mb-8 border-b pb-4">
           <div>
             <h2 className="text-3xl font-bold text-gray-800">My Design Collection</h2>
@@ -80,7 +84,7 @@ export default function Gallery() {
           </span>
         </div>
         
-        {/* --- EMPTY STATE --- */}
+        {/* EMPTY STATE */}
         {history.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-xl shadow-sm border border-gray-100">
             <p className="text-6xl mb-4">💎</p>
@@ -88,7 +92,7 @@ export default function Gallery() {
           </div>
         ) : (
           
-          /* --- GRID LAYOUT --- */
+          /* GRID LAYOUT */
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {history.map((design, index) => (
               <div 
@@ -96,9 +100,8 @@ export default function Gallery() {
                 onClick={() => setSelectedDesign(design)}
                 className="group bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden cursor-pointer transform hover:-translate-y-1"
               >
-                {/* Thumbnail Image */}
+                {/* Thumbnail Image with Windows Path and Local Placeholder Fix */}
                 <div className="relative h-64 bg-gray-50 overflow-hidden">
-                  {/* FIX 2: Updated Image Tag with Data URI Fallback */}
                   <img 
                     src={getImageUrl(design.image_path) || PLACEHOLDER_IMAGE}
                     alt={design.jewelry_type} 
@@ -106,7 +109,7 @@ export default function Gallery() {
                     loading="lazy"
                     onError={(e) => {
                       e.target.onerror = null; 
-                      e.target.src = PLACEHOLDER_IMAGE;
+                      e.target.src = PLACEHOLDER_IMAGE; // Use local SVG if ngrok blocks the load
                     }}
                   />
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
@@ -137,12 +140,11 @@ export default function Gallery() {
             
             <div 
               className="bg-white w-full max-w-5xl h-[85vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-fade-in"
-              onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
+              onClick={(e) => e.stopPropagation()} 
             >
               
               {/* LEFT: FULL IMAGE */}
               <div className="md:w-1/2 bg-gray-900 flex items-center justify-center p-6 relative">
-                 {/* FIX 2: Updated Modal Image Tag with Data URI Fallback */}
                  <img 
                    src={getImageUrl(selectedDesign.image_path) || PLACEHOLDER_IMAGE}
                    alt="Full Design" 
@@ -153,7 +155,6 @@ export default function Gallery() {
                    }}
                  />
                  
-                 {/* Download Button */}
                  <a 
                    href={getImageUrl(selectedDesign.image_path)}
                    download="genjewels_design.png"
@@ -169,7 +170,6 @@ export default function Gallery() {
               {/* RIGHT: DETAILS PANEL */}
               <div className="md:w-1/2 p-8 overflow-y-auto bg-white relative">
                 
-                {/* Close Button */}
                 <button 
                   onClick={() => setSelectedDesign(null)}
                   className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-800 transition bg-gray-100 rounded-full"
@@ -177,7 +177,6 @@ export default function Gallery() {
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
 
-                {/* Title & Date */}
                 <div className="mb-6">
                   <span className="bg-purple-100 text-purple-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
                     {selectedDesign.jewelry_type}
@@ -188,7 +187,6 @@ export default function Gallery() {
                   <p className="text-gray-400 text-sm">Created on {formatDate(selectedDesign.created_at)}</p>
                 </div>
 
-                {/* Full Prompt */}
                 <div className="mb-8">
                   <h4 className="text-xs font-bold text-pink-500 uppercase mb-2">✨ AI Generated Description</h4>
                   <div className="bg-pink-50 p-4 rounded-lg border border-pink-100 text-gray-700 text-sm leading-relaxed max-h-48 overflow-y-auto">
@@ -196,35 +194,29 @@ export default function Gallery() {
                   </div>
                 </div>
 
-                {/* Specifications Grid */}
+                {/* SPECIFICATIONS GRID */}
                 <h4 className="text-xs font-bold text-gray-500 uppercase mb-4 border-b pb-2">Design Specifications</h4>
                 <div className="grid grid-cols-2 gap-y-4 gap-x-8 text-sm">
-                  
                   <div>
                     <p className="text-gray-400 text-xs mb-1">Material</p>
                     <p className="font-semibold text-gray-800">{selectedDesign.material || 'N/A'}</p>
                   </div>
-                  
                   <div>
                     <p className="text-gray-400 text-xs mb-1">Gemstone</p>
                     <p className="font-semibold text-gray-800">{selectedDesign.stone || 'None'}</p>
                   </div>
-
                   <div>
                     <p className="text-gray-400 text-xs mb-1">Theme / Pattern</p>
                     <p className="font-semibold text-gray-800">{selectedDesign.theme || 'Standard'}</p>
                   </div>
-
                   <div>
                     <p className="text-gray-400 text-xs mb-1">Size / Weight</p>
                     <p className="font-semibold text-gray-800">{selectedDesign.size || 'Standard'}</p>
                   </div>
-
                   <div>
                     <p className="text-gray-400 text-xs mb-1">Finish</p>
                     <p className="font-semibold text-gray-800">{selectedDesign.finish || 'Polished'}</p>
                   </div>
-
                   {selectedDesign.extra_text && (
                     <div className="col-span-2 mt-2">
                       <p className="text-gray-400 text-xs mb-1">User Note</p>
@@ -234,12 +226,10 @@ export default function Gallery() {
                     </div>
                   )}
                 </div>
-
               </div>
             </div>
           </div>
         )}
-
       </div>
     </div>
   );
