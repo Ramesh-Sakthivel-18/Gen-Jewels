@@ -1,12 +1,12 @@
 import { createContext, useState, useEffect, useContext, useRef } from 'react';
-import { AuthContext } from './AuthContext'; // Import AuthContext
+import { AuthContext } from './AuthContext';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
 export const DesignContext = createContext();
 
 export const DesignProvider = ({ children }) => {
-  const { user } = useContext(AuthContext); // Access User status
+  const { user } = useContext(AuthContext);
   const [isGenerating, setIsGenerating] = useState(false);
   const [latestDesign, setLatestDesign] = useState(null);
   const [history, setHistory] = useState([]);
@@ -14,12 +14,17 @@ export const DesignProvider = ({ children }) => {
   // Use refs to track intervals so we can clear them easily
   const pollingInterval = useRef(null);
 
-  // 1. FETCH HISTORY (Only if User is Logged In)
+  // 1. FETCH HISTORY (Using verified path: /generate/history)
   const fetchHistory = async () => {
-    if (!user) return; // STOP: Don't fetch if logged out
+    if (!user) return;
 
     try {
-      const response = await api.get('/generate/history');
+      const response = await api.get('/generate/history', {
+        headers: {
+          'ngrok-skip-browser-warning': '69420',
+          'bypass-tunnel-reminder': 'true'
+        }
+      });
       setHistory(response.data);
     } catch (error) {
       console.error("Could not fetch history", error);
@@ -28,7 +33,7 @@ export const DesignProvider = ({ children }) => {
 
   // 2. RECOVERY LOGIC (Survives Refresh)
   const checkForPendingGeneration = async () => {
-    if (!user) return; // STOP: Don't recover if logged out
+    if (!user) return;
 
     const isPending = localStorage.getItem('is_generating') === 'true';
     
@@ -37,18 +42,23 @@ export const DesignProvider = ({ children }) => {
       setIsGenerating(true);
       const toastId = toast.loading('Resuming checks for your design...');
       
-      // Clear any existing interval first
       if (pollingInterval.current) clearInterval(pollingInterval.current);
 
-      // Start Polling: Check History every 3 seconds
+      // Polling: Check History every 3 seconds
       pollingInterval.current = setInterval(async () => {
         try {
-          if (!user) { // Safety check inside interval
+          if (!user) {
              clearInterval(pollingInterval.current);
              return;
           }
 
-          const res = await api.get('/generate/history');
+          // Use verified history path
+          const res = await api.get('/generate/history', {
+            headers: {
+              'ngrok-skip-browser-warning': '69420',
+              'bypass-tunnel-reminder': 'true'
+            }
+          });
           const latest = res.data[0];
 
           if (latest) {
@@ -56,13 +66,13 @@ export const DesignProvider = ({ children }) => {
              const now = Date.now();
              const timeDiff = (now - createdTime) / 1000; 
 
+             // If the newest design in history was created in the last 2 minutes, it's our result
              if (timeDiff < 120) { 
                clearInterval(pollingInterval.current);
                completeGeneration(latest, toastId);
              }
           }
         } catch (err) {
-          // If we get a 401 inside the interval, stop immediately
           if (err.response && err.response.status === 401) {
             clearInterval(pollingInterval.current);
             setIsGenerating(false);
@@ -87,11 +97,9 @@ export const DesignProvider = ({ children }) => {
   // 3. WATCH FOR USER LOGIN/LOGOUT
   useEffect(() => {
     if (user) {
-      // User just logged in (or app loaded with token) -> Fetch Data
       fetchHistory();
       checkForPendingGeneration();
     } else {
-      // User logged out -> Clear Data & Stop Polling
       setHistory([]);
       setLatestDesign(null);
       setIsGenerating(false);
@@ -111,7 +119,8 @@ export const DesignProvider = ({ children }) => {
     toast.success('Design Ready!');
   };
 
-  const generateDesign = async (params) => {
+  // 4. GENERATE DESIGN (Updated with verified endpoints)
+  const generateDesign = async (params, isImageToImage = false) => {
     if (!user) {
       toast.error("Please login to generate.");
       return;
@@ -126,16 +135,31 @@ export const DesignProvider = ({ children }) => {
     });
 
     try {
-      const response = await api.post('/generate/', params);
+      // Determine endpoint based on verified backend routes
+      // Standard: /generate/ | Image-to-Image: /generate/image-to-image
+      const endpoint = isImageToImage ? '/generate/image-to-image' : '/generate/';
+      
+      const response = await api.post(endpoint, params, {
+        headers: {
+          'ngrok-skip-browser-warning': '69420',
+          'bypass-tunnel-reminder': 'true'
+        }
+      });
+      
       completeGeneration(response.data, toastId);
     } catch (error) {
       console.error(error);
-      if (error.code !== "ERR_NETWORK" && error.code !== "ECONNABORTED") {
-         setIsGenerating(false);
-         localStorage.removeItem('is_generating');
-         toast.dismiss(toastId);
+      const status = error.response?.status;
+      
+      if (status === 404) {
+        toast.error('Endpoint not found (404). Please verify backend routes.');
+      } else if (error.code !== "ERR_NETWORK" && error.code !== "ECONNABORTED") {
          toast.error('Generation Failed.');
       }
+
+      setIsGenerating(false);
+      localStorage.removeItem('is_generating');
+      toast.dismiss(toastId);
     }
   };
 
