@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import api from '../services/api'; 
+import axios from 'axios';
 import { useServer } from '../context/ServerContext';
 import toast from 'react-hot-toast';
 
@@ -78,24 +78,38 @@ export default function ImageToImage() {
     
     setIsGenerating(true);
     
+    // Create FormData with correct field names
     const formData = new FormData();
-    formData.append('init_image', selectedFile); 
-    formData.append('jewelry_type', jewelryType); 
-    formData.append('prompt', prompt); 
-    formData.append('strength', '0.75'); 
+    formData.append('file', selectedFile); // IMPORTANT: Backend expects 'file'
+    formData.append('prompt', `${jewelryType}${prompt ? ': ' + prompt : ''}`); // Combine jewelry type with prompt
 
     try {
-      const response = await api.post('/generate/image-to-image', formData, { 
-        headers: { 
-          'Content-Type': 'multipart/form-data',
-          'bypass-tunnel-reminder': 'true'
+      // Use environment variable for API URL
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/generate-image`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'bypass-tunnel-reminder': 'true', // Required for LocalTunnel
+            'ngrok-skip-browser-warning': 'true' // Extra safety for ngrok
+          }
         }
-      });
+      );
+      
       setResultImage(response.data.image_url);
       toast.success("✨ Transformation Complete!");
     } catch (error) {
-      console.error(error);
-      toast.error("⚠️ Generation Failed. Check backend connection.");
+      console.error('Generation error:', error);
+      if (error.response) {
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+        toast.error(`⚠️ Generation Failed: ${error.response.status} - ${error.response.data?.detail || 'Unknown error'}`);
+      } else if (error.request) {
+        toast.error("⚠️ No response from server. Check backend connection.");
+      } else {
+        toast.error(`⚠️ Request error: ${error.message}`);
+      }
     } finally {
       setIsGenerating(false);
       setLoadingMessageIndex(0);
@@ -317,8 +331,8 @@ export default function ImageToImage() {
                       ${isGenerating 
                         ? 'opacity-50 cursor-not-allowed' 
                         : jewelryType === type.name 
-                        ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white scale-105' 
-                        : 'bg-slate-50 hover:bg-slate-100 hover:shadow-lg hover:scale-105'}
+                        ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white scale-105 border-indigo-600' 
+                        : 'bg-slate-50 hover:bg-slate-100 hover:shadow-lg hover:scale-105 border-slate-200'}
                     `}
                   >
                     <div className="text-3xl mb-2">{type.icon}</div>
@@ -349,14 +363,14 @@ export default function ImageToImage() {
             {/* GENERATE BUTTON */}
             <button
               onClick={handleGenerate}
-              disabled={isGenerating || !selectedFile || !jewelryType}
+              disabled={isGenerating || !selectedFile || !jewelryType || !isServerLive}
               className={`w-full py-6 text-white font-bold rounded-3xl text-xl shadow-2xl transition-all duration-300 transform
-                ${isGenerating || !selectedFile || !jewelryType 
+                ${isGenerating || !selectedFile || !jewelryType || !isServerLive
                   ? 'bg-slate-400 cursor-not-allowed' 
                   : 'bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 hover:shadow-3xl hover:scale-105 hover:brightness-105'}
               `}
             >
-              {isGenerating ? 'Transforming...' : '✨ Transform Image'}
+              {!isServerLive ? '🔴 Offline' : isGenerating ? '✨ Transforming...' : '🚀 Transform Image'}
             </button>
           </div>
 
