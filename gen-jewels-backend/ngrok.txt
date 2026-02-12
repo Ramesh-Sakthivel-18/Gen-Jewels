@@ -1,0 +1,4 @@
+.\ngrox
+ngrok config check
+ngrok config add-authtoken 39YWE1rFuNl7vsDENrWcJfyzpnu_5UAar1dQgNEVb4m98gMaL
+.\ngrok http 8000

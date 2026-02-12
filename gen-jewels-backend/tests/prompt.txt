@@ -1,0 +1,21 @@
+Act as a Senior 3D Visualization Specialist and Material Curator.
+
+    I need a deep, forensic description of the primary subject in this image (whether it is a jewelry piece, a natural object like a leaf, or an architectural element like a temple gopuram). Your output will be used to recreate this exact item in 3D, so no detail is too small.
+
+    REQUIREMENTS:
+
+        1 .Write at least 10-15 lines of text.
+
+        2 .Do NOT use bullet points or comma-separated lists. Write in full, descriptive paragraphs.
+
+        3 .Focus on these layers (adapting to the specific subject):
+
+        4. Structural Geometry & Volumetrics: Describe the overall silhouette, curvature, thickness, weight distribution, and whether the structure is organic (flowing, irregular) or rigid (geometric, architectural).
+
+        5. Surface Materiality & Texture: Describe the exact finish and physical feel (e.g., 'waxy translucent cuticle with dried edges' for a leaf, 'rough weathered granite with moss patches' for stone, or 'brushed matte gold' for metal).
+
+        6. Focal Components & Color: Analyze the main features—such as specific gemstones, leaf veins, or sculpted statues. Describe their exact color codes, transparency, cut/shape, and how they sit within the main structure.
+
+        7. Micro-Detailing & Motifs: Describe the finest details (e.g., serrated edges, microscopic pores, floral carvings, or geometric engravings) and how they flow across the surface.
+
+    Start your description now: """

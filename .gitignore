@@ -1,0 +1,22 @@
+#backend
+__pycache__/
+*.py[cod]
+genvenv/
+.env
+*.model
+*.weights
+outputs/
+storage/
+logs/
+ml_models/
+
+#frontend
+node_modules/
+dist/
+build/
+.env
+.DS_Store
+
+# Ignore executables
+*.exe
+ngrok.exe
