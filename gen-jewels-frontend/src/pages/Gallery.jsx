@@ -102,7 +102,8 @@ export default function Gallery() {
                     loading="lazy"
                     onError={(e) => {
                       e.target.onerror = null; 
-                      e.target.src = "https://via.placeholder.com/400x400?text=Error+Loading";
+                      // This is a "Data URI" - it draws a gray box with text locally without internet
+                      e.target.src = "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22400%22%20viewBox%3D%220%200%20400%20400%22%3E%3Crect%20fill%3D%22%23ddd%22%20width%3D%22400%22%20height%3D%22400%22%2F%3E%3Ctext%20fill%3D%22%23555%22%20font-family%3D%22sans-serif%22%20font-size%3D%2230%22%20dy%3D%2210.5%22%20font-weight%3D%22bold%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%3EImage%20Offline%3C%2Ftext%3E%3C%2Fsvg%3E";
                     }}
                   />
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
