@@ -6,20 +6,20 @@ export const ServerProvider = ({ children }) => {
   const [isServerLive, setIsServerLive] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
 
-  // Use the same logic as api.js to find the URL
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  // Matches your Netlify Variable "VITE_API_URL"
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
     const checkServerStatus = async () => {
       try {
-        // 5-second timeout to prevent hanging if Ngrok is paused
+        // 5-second timeout to avoid hanging
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         const response = await fetch(`${API_BASE_URL}/health`, {
           method: 'GET',
           headers: {
-             // ADDED: Critical header for Ngrok free tier
+             // MANDATORY: Checks server status without getting blocked by Ngrok
             'ngrok-skip-browser-warning': 'true'
           },
           signal: controller.signal,
@@ -33,21 +33,19 @@ export const ServerProvider = ({ children }) => {
           setIsServerLive(false);
         }
       } catch (error) {
-        // Network error, Timeout, or 404 -> Server is Offline
+        // Error means PC is off or Ngrok is disconnected
         setIsServerLive(false);
       } finally {
         setIsChecking(false);
       }
     };
 
-    // Initial check immediately when the website loads
+    // Initial check on load
     checkServerStatus();
 
-    // RAPID 1-MINUTE POLLING
-    // 60000 milliseconds = Exactly 1 Minute
+    // Check again every 60 seconds
     const intervalId = setInterval(checkServerStatus, 60000);
 
-    // Cleanup interval if the user closes the app
     return () => clearInterval(intervalId);
   }, [API_BASE_URL]);
 

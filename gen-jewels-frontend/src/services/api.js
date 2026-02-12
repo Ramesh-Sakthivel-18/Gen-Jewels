@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 // 1. Determine the Base URL
-// Priority: Environment Variable -> Localhost Fallback
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Matches your Netlify Variable "VITE_API_URL"
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 console.log(`🔌 Connecting to Backend at: ${API_BASE_URL}`);
 
@@ -11,12 +11,12 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
-    // ADDED: Mandatory header to bypass Ngrok's browser warning page
+    // MANDATORY: This bypasses the Ngrok "Visit Site" warning page
     'ngrok-skip-browser-warning': 'true'
   },
 });
 
-// 3. Add Token Interceptor (Preserve existing auth logic)
+// 3. Add Token Interceptor (Keeps you logged in)
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
