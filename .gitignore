@@ -20,3 +20,9 @@ build/
 # Ignore executables
 *.exe
 ngrok.exe
+
+
+*.tar
+node_modules/
+dist/
+build/
