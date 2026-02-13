@@ -56,10 +56,11 @@ def generate_enhanced_prompt(data: dict) -> str:
            - Inject keywords to pull back the zoom: "full piece perfectly framed," "entire jewelry item visible," "centered composition," and "uncropped."
 
         OUTPUT TEMPLATE (Comma-Separated String):
+        MORE IMPORTANT : Return ONLY the raw comma-separated prompt string inside a code block. Strictly limit the output to 70 words or fewer.
         "Professional macro jewelry photography of [Item + Material + Finish], [Specific Jewelry Anatomy/Construction], [Gemstone Details + Optics], [Thematic Details as Metal Sculpture], [Lighting & Camera Specs], 8k, masterpiece, ultra-detailed."
 
-        Example Input: "Blue sapphire pendant shaped like a tear"
-        Example Output: "Professional macro jewelry photography of a platinum pendant necklace, pear-shaped silhouette, massive solitaire sapphire with deep blue saturation and internal light refraction, secure 3-prong v-tip setting, high-polish platinum bail, articulated chain links, studio softbox lighting, 105mm macro lens, sharp focus, caustics, 8k, hyper-realistic"
+        Example Input: "Bangle, Leaf theme, Rose Gold, Matte finish."
+        Example Output: "Professional product photography of a rose gold bangle, full-frame centered composition, entire object visible, no cropping, sculpted organic leaf motif relief, matte brushed 18k metal texture, solid jewelry construction, ray-traced reflections, macro 85mm lens, f/4.0 deep focus, studio softbox lighting, high-end commercial finish, neutral jewelry stand, 8k, photorealistic, sharp focus."
         no i meant to add more descriptions so that the prompt becomes better
         """
         user_message = f"Optimize: {user_input}"
@@ -88,13 +89,17 @@ def generate_enhanced_prompt(data: dict) -> str:
         5.  *Material Physics:* Describe the {data['material']} surface (e.g., "brushed," "high-polish," "hammered") and {data['stone']} optics (e.g., "light refraction," "inclusion-free," "faceted").
         6.  *Context & Scale:* Place the item on a "textured black velvet bust," "ring mandrel," or "neutral jewelry display stand" to provide scale reference.
         7.  *Framing & Composition:* You MUST ensure the jewelry is NOT cropped. Include keywords like "full piece perfectly framed," "entire jewelry item visible," "centered composition," and "zoomed out," to make sure the complete item fits perfectly within the image boundaries.
+        8.  *Return ONLY the raw comma-separated prompt string inside a code block. Strictly limit the output to 70 words or fewer.
 
         OUTPUT FORMAT:
+        MORE IMPORTANT : Return ONLY the raw comma-separated prompt string inside a code block. Strictly limit the output to 70 words or fewer.
         Provide ONLY the raw comma-separated prompt string. 
 
-        Example Logic:
-        Input: "Gold ring, Lion theme" -> Output: "Professional jewelry product photography of a gold finger ring, featuring a miniature sculpted lion head motif embossed on the shank, distinct polished band, prong-set ruby eyes, wearable jewelry design, macro shot, full piece perfectly framed, centered composition, entire jewelry item visible, commercial lighting, 8k"
-        """
+        Eaxmple Login: 
+        Input: Bangle, Leaf theme, Rose Gold, Matte finish.
+        Output:
+            Professional product photography of a rose gold bangle, full-frame centered composition, entire object visible, no cropping, sculpted organic leaf motif relief, matte brushed 18k metal texture, solid jewelry construction, ray-traced reflections, macro 85mm lens, f/4.0 deep focus, studio softbox lighting, high-end commercial finish, neutral jewelry stand, 8k, photorealistic, sharp focus.
+            """
         user_message = f"Specs: {data}"
 
     try:
@@ -112,58 +117,48 @@ def generate_enhanced_prompt(data: dict) -> str:
         print(f"❌ Groq Error: {e}")
         return f"{data.get('extra_text', '')}, 8k, photorealistic"
 
-# --- NEW FUNCTION FOR IMAGE-TO-IMAGE ---
-def transform_design_prompt(design_dna: str, target_type: str) -> str:
+# --- UPDATED FUNCTION FOR IMAGE-TO-IMAGE + INSTRUCTION ---
+def transform_design_prompt(design_dna: str, target_type: str, user_instruction: str = None) -> str:
     """
-    Transforms 'Design DNA' (Source Description) into a manufacturing-ready 
-    SDXL prompt for a specific Jewelry Item (Target Shape).
+    Takes 'Design DNA' (Texture) + 'Target Shape' + 'User Instruction'.
+    The User Instruction overrides the DNA if they conflict.
     """
-    
-    # 1. ROBUST SYSTEM INSTRUCTION FOR SDXL REALISM
+    if not client:
+        return f"A {target_type} featuring {design_dna}, {user_instruction or ''}, 8k, photorealistic"
+
     system_instruction = """
-    You are a Senior Jewelry CAD Specialist and Expert SDXL Prompt Engineer.
-    
-    YOUR GOAL: 
-    Convert a raw visual description (Design DNA) and a target item (e.g., Ring, Necklace) into a 
-    highly technical, photorealistic Stable Diffusion XL prompt. 
-    The result must look like a physical, manufactured luxury product, NOT a drawing.
+    1. Role / Context
+        Act as a Master Jewelry CAD Engineer and Senior SDXL Prompt Architect. You are an expert at "Material Translation"—converting organic "Source DNA" into high-end, manufacturable luxury jewelry. Your objective is to generate a prompt that results in a perfectly framed, physical product shot.
 
-    INPUT DATA:
-    - Target Shape: {target_type} (The object to be created)
-    - Design DNA: {design_dna} (The source texture/pattern/motif to apply)
+    2. Task / Instruction
+        Synthesize the Target Shape (e.g., Ring, Bangle) and the Design DNA (VLM description) into a single technical prompt. You must also prioritize any User Instruction for specific materials or styles.
+        The Transformation Rule: Convert all organic/nature descriptions into precious metals and gemstones.
+        The "Jewelry-Only" Rule: The final output must be a solid jewelry item. No green leaves or real flowers—only the shape and texture translated into metal.
+        The Alignment Rule: If the user query specifies a material (e.g., "Silver"), it overrides the colors found in the DNA.
 
-    ### STRICT PROMPT CONSTRUCTION RULES:
+    3. Input / Details & Constraints
+        Full-Frame Composition: Include: "Full-frame composition," "centered subject," "entire object visible within the frame," and "no cropping."
+        Subject Start: Start with: "Macro professional product photography of a [Target Shape]..."
+        Structural Reality: Use: "Solid metal construction," "heavy shank," "seamless joints," and "reinforced bail."
+        Material Physics: Define the metal precisely (18k Yellow Gold, Platinum, etc.) and specify "Ray-traced reflections" and "Anisotropic highlights."
+        Photography Specs: "Shot on 85mm lens for natural proportions, f/4.0 for deep focus, studio softbox lighting, clean neutral background."
 
-    1. **SUBJECT DEFINITION (The Anchor):**
-       - Start immediately with: "Macro product photography of a [Target Shape]..."
-       - FORCE the "Design DNA" to be the *material structure* or *surface finish*. 
-       - *Crucial Conversion:* - If DNA is "Nature/Organic" (e.g., leaf, flower) -> Convert to "cast gold organic form," "biomorphic metal structure," or "intricate botanical bas-relief."
-         - If DNA is "Architecture/Geometric" (e.g., temple, building) -> Convert to "micro-architectural engraving," "structural filigree," or "geometric stepped bezel."
+    4. Output Format
+        MORE IMPORTANT : Return ONLY the raw comma-separated prompt string inside a code block. Strictly limit the output to 70 words or fewer.
+        Return ONLY the final prompt string inside a code block. Do not provide any preamble.
+        Example Logic for the AI:
+        Input DNA: "A brittle, serrated leaf with complex vein structures."
+        Target Shape: "Bangle."
+        User Instruction: "Make it in Platinum."
 
-    2. **MANUFACTURING REALISM (The "Buildable" Factor):**
-       - You MUST include structural jewelry terms to ensure it looks wearable.
-       - Use keywords: "Prong setting," "solid metal shank," "reinforced bezel," "articulated links," "polished chamfered edges," "milgrain detailing."
-       - *Avoid* floating parts. Everything must be connected (soldered/cast).
-
-    3. **MATERIAL & PHYSICS (The Look):**
-       - Define the metal: "18k Brushed Gold," "Oxidized Silver," or "Platinum."
-       - Define the reaction: "Subsurface scattering," "anisotropic metal reflections," "ray-traced caustics," "heavy cold metal feel."
-
-    4. **CAMERA & LIGHTING (The SDXL Magic):**
-       - Use specific photography tags for depth: "100mm Macro Lens," "f/2.8 aperture," "shallow depth of field (bokeh)."
-       - Lighting: "Studio softbox lighting," "Rim lighting to highlight texture," "Global Illumination," "Octane Render style."
-
-    ### FINAL OUTPUT FORMAT:
-    Return ONLY the final prompt string. No explanations.
-    
-    Example Logic:
-    - Input: Target="Bangle", DNA="Detailed photo of a dry, cracked autumn leaf"
-    - Output: "Macro product photography of a wide gold bangle, the metal surface mimics a dry cracked autumn leaf texture with deep jagged engravings and vein relief, organic biomorphic casting, 18k yellow gold with matte oxidized recesses, heavy jewelry construction, studio lighting, sharp focus, 8k, unreal engine 5 render, hyperrealistic."
-    """
+            Your Output:   
+                Professional product photography of a Platinum bangle, full-frame centered composition, entire object visible, no cropping, sculpted serrated leaf motif relief, deep vein engravings, solid jewelry construction, polished chamfered edges, ray-traced platinum reflections, macro 85mm lens, f/4.0 deep focus, studio softbox lighting, high-end commercial finish, neutral jewelry stand, 8k, hyper-realistic, sharp focus.
+"""
 
     user_message = f"""
-    TARGET SHAPE: "{target_type}"
-    DESIGN DNA (Source Texture): "{design_dna}"
+    Target Shape: "{target_type}"
+    Source Design DNA (Texture): "{design_dna}"
+    User Instruction (Override): "{user_instruction if user_instruction else 'None - follow DNA exactly'}"
     """
 
     try:
@@ -173,10 +168,11 @@ def transform_design_prompt(design_dna: str, target_type: str) -> str:
                 {"role": "user", "content": user_message}
             ],
             model="llama-3.3-70b-versatile",
-            temperature=0.3,
-            max_tokens=150,
+            temperature=0.3, # Slightly creative to blend instructions
+            max_tokens=200,
         )
         return completion.choices[0].message.content.strip()
+
     except Exception as e:
         print(f"❌ Optimization Error: {e}")
-        return f"A {target_type} featuring {design_dna}, 8k, photorealistic"
+        return f"A {target_type} featuring {design_dna}, {user_instruction}, 8k, photorealistic"

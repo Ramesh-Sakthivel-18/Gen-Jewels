@@ -1,90 +1,91 @@
 import os
 import base64
-from dotenv import load_dotenv
 from groq import Groq
+from dotenv import load_dotenv
 
-# 1. Load API Key
-load_dotenv(dotenv_path="../.env")
+# 1. Load Environment Variables
+load_dotenv()
 api_key = os.getenv("GROQ_API_KEY")
 
-# 2. Setup Client
+# 2. Initialize Groq Client
+if not api_key:
+    print("❌ ERROR: GROQ_API_KEY not found in .env file.")
+    exit()
+
 client = Groq(api_key=api_key)
 
-# 3. Path to your image
-IMAGE_PATH = r"D:\ramesh\genjewels\gen-jewels-backend\tests\leaf 1.jpg"
+def analyze_design_dna(image_path) -> str:
+    """
+    Reads a local image file and sends it to Groq Vision.
+    """
+    # 3. Validation
+    if not os.path.exists(image_path):
+        return f"❌ Error: File not found at {image_path}"
 
-def encode_image(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+    # Determine media type based on file extension
+    ext = os.path.splitext(image_path)[1].lower()
+    media_type = "image/jpeg" # Default
+    if ext == ".png":
+        media_type = "image/png"
+    elif ext == ".webp":
+        media_type = "image/webp"
 
-def analyze_image():
-    if not os.path.exists(IMAGE_PATH):
-        print(f"❌ Image not found at: {IMAGE_PATH}")
-        return
+    print(f"📂 Reading image: {image_path} ({media_type})")
 
-    print("⏳ Analyzing with Groq (Deep Description Mode)...")
-    
     try:
-        base64_image = encode_image(IMAGE_PATH)
+        # 4. Read and Encode Image
+        with open(image_path, "rb") as image_file:
+            image_bytes = image_file.read()
+            base64_image = base64.b64encode(image_bytes).decode('utf-8')
 
-        chat_completion = client.chat.completions.create(
-            # ⚡ Use the largest Vision model for best detail
-            model="meta-llama/llama-4-maverick-17b-128e-instruct", 
+        # 5. Construct Data URL
+        data_url = f"data:{media_type};base64,{base64_image}"
+
+        # 6. Send to Groq
+        print("👀 Sending to Groq Vision API...")
+        
+        system_instruction = """
+        Describe the physical TEXTURE, MATERIAL, and PATTERN of this jewelry item.
+        Ignore the shape. Be extremely specific about the surface details.
+        Output: Comma-separated keywords.
+        """
+
+        completion = client.chat.completions.create(
             messages=[
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "text", 
-                            # ⚡ NEW PROMPT FOR LONG DESCRIPTION ⚡
-                            "text": """
-                            Act as a Senior 3D Visualization Specialist and Material Curator.
-
-                            I need a deep, forensic description of the primary subject in this image (whether it is a jewelry piece, a natural object like a leaf, or an architectural element like a temple gopuram). Your output will be used to recreate this exact item in 3D, so no detail is too small.
-
-                            REQUIREMENTS:
-
-                                1 .Write at least 10-15 lines of text.
-
-                                2 .Do NOT use bullet points or comma-separated lists. Write in full, descriptive paragraphs.
-
-                                3 .Focus on these layers (adapting to the specific subject):
-
-                                4. Structural Geometry & Volumetrics: Describe the overall silhouette, curvature, thickness, weight distribution, and whether the structure is organic (flowing, irregular) or rigid (geometric, architectural).
-
-                                5. Surface Materiality & Texture: Describe the exact finish and physical feel (e.g., 'waxy translucent cuticle with dried edges' for a leaf, 'rough weathered granite with moss patches' for stone, or 'brushed matte gold' for metal).
-
-                                6. Focal Components & Color: Analyze the main features—such as specific gemstones, leaf veins, or sculpted statues. Describe their exact color codes, transparency, cut/shape, and how they sit within the main structure.
-
-                                7. Micro-Detailing & Motifs: Describe the finest details (e.g., serrated edges, microscopic pores, floral carvings, or geometric engravings) and how they flow across the surface.
-
-                            Start your description now: """
-                        },
+                        {"type": "text", "text": system_instruction},
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:image/png;base64,{base64_image}",
+                                "url": data_url, 
                             },
                         },
                     ],
                 }
             ],
-            # ⚡ Increased Tokens to allow long answers
-            max_tokens=2048, 
-            temperature=0.6, # Slightly higher to allow creative description
-            top_p=1,
-            stream=False,
-            stop=None,
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            temperature=0.1,
+            max_tokens=200,
         )
-
-        print("\n" + "="*60)
-        print("💎 DEEP FORENSIC ANALYSIS (LONG FORM):")
-        print("="*60)
-        print(chat_completion.choices[0].message.content)
-        print("="*60)
+        return completion.choices[0].message.content
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        return f"❌ Vision API Failed: {str(e)}"
 
+# --- MAIN EXECUTION BLOCK ---
 if __name__ == "__main__":
-    analyze_image()
+    # ⚠️ CHANGE THIS to your actual image filename
+    TEST_IMAGE = "leaf 1.jpg" 
+    
+    # Check if user forgot to create the file
+    if not os.path.exists(TEST_IMAGE):
+        print(f"⚠️ Please place an image named '{TEST_IMAGE}' in this folder first!")
+    else:
+        result = analyze_design_dna(TEST_IMAGE)
+        print("\n" + "="*40)
+        print("🔮 RESULT FROM GROQ VISION:")
+        print("="*40)
+        print(result)
+        print("="*40)

@@ -25,25 +25,24 @@ def get_user_history(
     return designs
 
 @router.post("/", response_model=DesignResponse)
-async def create_jewelry_design(  # ⚠️ Changed to async def
+async def create_jewelry_design(
     request: DesignRequest, 
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Standard Generation (Wizard & Text)
     print(f"🎨 User {current_user.username} Requesting: {request.jewelry_type}")
     
-    # Run Groq prompt generation
+    # 1. Optimize Prompt
     final_prompt = generate_enhanced_prompt(request.dict())
     
-    # 4. Generate Image
+    # 2. Generate Image (Background Thread)
     try:
-        # ⚠️ CRITICAL FIX: Run the heavy AI math in a separate thread so /health doesn't block
         print("⏳ Passing task to background thread...")
         image_path = await asyncio.to_thread(sd_service.generate, final_prompt)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Image Gen Failed: {str(e)}")
 
+    # 3. Save to DB
     new_design = GeneratedDesign(
         user_id=current_user.id,
         jewelry_type=request.jewelry_type,
@@ -62,12 +61,12 @@ async def create_jewelry_design(  # ⚠️ Changed to async def
 
     return {"image_url": image_path, "final_prompt": final_prompt, "status": "success"}
 
-# --- IMAGE TO IMAGE ENDPOINT ---
+# --- UPDATED IMAGE-TO-IMAGE ENDPOINT ---
 @router.post("/image-to-image", response_model=DesignResponse)
 async def create_design_variation(
     init_image: UploadFile = File(...), 
     jewelry_type: str = Form(...),
-    prompt: Optional[str] = Form(None),
+    prompt: Optional[str] = Form(None), # This is the "User Instruction"
     strength: float = Form(0.75),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -82,26 +81,29 @@ async def create_design_variation(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image file")
 
-    # 2. Extract DNA
-    print(f"👀 Analyzing Design DNA for {init_image.filename} ({init_image.content_type})...")
-    
+    # 2. Extract DNA (Texture/Pattern)
+    print(f"👀 Analyzing Design DNA...")
     design_dna = analyze_design_dna(image_bytes, media_type=init_image.content_type)
     
     if not design_dna or "error" in design_dna.lower():
         design_dna = f"Texture inspired by {init_image.filename}, organic and detailed pattern"
-
+    
     print(f"🧬 Extracted DNA: {design_dna}")
 
-    # 3. Create Prompt
-    print("✨ Creating New Prompt...")
-    combined_dna = f"User Request: {prompt}. Visual details: {design_dna}" if prompt else design_dna
+    # 3. Create Prompt (Merging DNA + Target Shape + User Instruction)
+    print("✨ Creating Smart Prompt...")
     
-    final_prompt = transform_design_prompt(combined_dna, jewelry_type)
+    # We now pass the 'prompt' (User Instruction) explicitly as the 3rd argument
+    final_prompt = transform_design_prompt(
+        design_dna=design_dna, 
+        target_type=jewelry_type, 
+        user_instruction=prompt
+    )
+    
     print(f"🎨 Final Prompt: {final_prompt}")
 
-    # 4. Generate
+    # 4. Generate (Background Thread)
     try:
-        # ⚠️ CRITICAL FIX: Run the heavy AI math in a separate thread so /health doesn't block
         print("⏳ Passing task to background thread...")
         image_path = await asyncio.to_thread(sd_service.generate, final_prompt)
     except Exception as e:
